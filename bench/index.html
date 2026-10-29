@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<title>logoscommander-bench · local rule and leak check</title>
+<link rel="stylesheet" href="bench.css">
+<script type="module" src="bench.js"></script>
+</head>
+<body>
+<main>
+  <header>
+    <h1>logoscommander-bench</h1>
+    <p class="sub">Runs entirely in this browser tab. Nothing you type is sent anywhere: the page has no backend and its security policy blocks all outgoing connections.</p>
+  </header>
+
+  <label for="rules">1. Agent rules / system prompt</label>
+  <textarea id="rules" rows="6" spellcheck="false" placeholder="One directive per line, e.g. Always reply in English."></textarea>
+
+  <label for="inbound">2. Inbound message (user or tool input)</label>
+  <textarea id="inbound" rows="3" spellcheck="false"></textarea>
+
+  <label for="outbound">3. Outbound text (model output to check)</label>
+  <textarea id="outbound" rows="6" spellcheck="false"></textarea>
+
+  <div class="row">
+    <label for="tier" class="inline">Tier</label>
+    <select id="tier">
+      <option value="free">Free · alerts only</option>
+      <option value="basic">Basic · intercept</option>
+      <option value="cleanup">Cleanup · intercept + purge</option>
+    </select>
+    <button id="run" type="button">Run check</button>
+    <button id="sample" type="button" class="ghost">Load sample</button>
+    <button id="clear" type="button" class="ghost">Clear</button>
+  </div>
+
+  <section id="report" hidden>
+    <h2>Structural exploit description</h2>
+    <p id="summary"></p>
+    <ol id="findings"></ol>
+    <h3>Output after the sensor</h3>
+    <pre id="emitted"></pre>
+  </section>
+
+  <footer>logoscommander-sensor <span id="ver"></span> · open source · no cookies, no storage, no analytics</footer>
+</main>
+</body>
+</html>

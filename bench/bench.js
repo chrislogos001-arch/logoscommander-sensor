@@ -55,8 +55,22 @@ function run() {
     ? `${findings.length} finding(s)${actions.length ? `, action: ${[...new Set(actions)].join(", ")}` : ""}. Checked in ${(ms * 1000).toFixed(0)} µs in this browser.`
     : `No conflicts or leaks found. Checked in ${(ms * 1000).toFixed(0)} µs in this browser.`;
   $("summary").className = findings.length ? "" : "none";
+  showAlert(findings, tier);
   $("emitted").textContent = pushed.emit + flushed.emit;
   $("report").hidden = false;
+}
+
+function showAlert(findings, tier) {
+  const box = $("alert");
+  const sniff = findings.some((f) => f.rule === "X01");
+  const leaks = findings.filter((f) => f.dir === "out" && f.rule.startsWith("S"));
+  if (!sniff && !leaks.length) return (box.hidden = true);
+  const fate = tier === "free" ? "Free tier: reported only, output was not changed." : sniff && tier === "basic" ? "The stream was stopped and the credential redacted." : sniff ? "Credential redacted, context purged, fresh session started." : "Credential redacted from the output.";
+  const head = sniff ? "Logical collision: credential request in the input, credential in the output" : `Credential leak in the output (${leaks.length})`;
+  const p = document.createElement("p");
+  p.textContent = fate;
+  box.replaceChildren(document.createTextNode(head), p);
+  box.hidden = false;
 }
 
 function sample() {
@@ -69,6 +83,7 @@ function sample() {
 function clear() {
   for (const id of ["rules", "inbound", "outbound"]) $(id).value = "";
   $("findings").replaceChildren();
+  $("alert").hidden = true;
   $("emitted").textContent = "";
   $("report").hidden = true;
 }

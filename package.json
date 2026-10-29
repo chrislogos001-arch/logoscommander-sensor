@@ -1,6 +1,6 @@
 {
   "name": "logoscommander-sensor",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Stateless, dependency-free secret-leak and rule-conflict filter for LLM agent token streams",
   "type": "module",
   "main": "sensor/sensor.js",

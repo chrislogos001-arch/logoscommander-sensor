@@ -1,7 +1,7 @@
 // logoscommander-sensor: stateless, dependency-free filter for LLM agent token streams.
 // One ES module; runs unchanged in Node >= 18 and in browsers.
 
-export const VERSION = "1.0.0";
+export const VERSION = "1.0.1";
 
 // Tier -> behaviour. free: report only. basic: redact secrets, stop the stream on a sniffing signature.
 // cleanup: as basic, but on a sniffing signature zero the tracked context buffers and continue on a fresh session.
@@ -18,18 +18,28 @@ export const SECRET_RULES = Object.freeze([
   { id: "S08", name: "Slack token", re: /\bxox[abprs]-[A-Za-z0-9-]{10,}/g },
   { id: "S09", name: "Private key block", re: /-----BEGIN [A-Z ]*PRIVATE KEY-----/g },
   { id: "S10", name: "JSON Web Token", re: /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g },
+  { id: "S11", name: "Database connection string with password", re: /\b(?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|redis|rediss|amqp|mssql):\/\/[^\s:@\/]+:[^\s@\/]+@[^\s"'<>]+/gi },
+  // Generic NAME=value / NAME: value where NAME looks like a credential (DB_PASS=..., api_key: ..., DB_USER=...).
+  // Only the value is matched, so redaction keeps the variable name. Placeholders (null, ***, ${VAR}, <...>) are skipped.
+  {
+    id: "S12",
+    name: "Credential assignment",
+    re: /(?<=(?<![A-Za-z])(?:pass(?:word|wd)?|pwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret|credentials?|(?:db|database|mysql|postgres|pg|mongo|redis|smtp|ftp)_?user(?:name)?)["']?[ \t]{0,3}[:=][ \t]{0,3}["']?)(?!(?:null|none|true|false|undefined|redacted|changeme|\*{3,}|x{3,})(?![^\s"',;&)]))(?![<$%{*\[])[^\s"',;&)]{3,}/gi,
+  },
 ]);
 
 // Inbound requests that try to pull secrets or hidden instructions out of the agent's context.
 export const PROBE_RULES = Object.freeze([
   { id: "P01", name: "System prompt extraction", re: /\b(?:print|show|reveal|repeat|output|dump|leak)\b[^.\n]{0,40}\b(?:system prompt|hidden instructions|initial instructions|developer message)\b/gi },
-  { id: "P02", name: "Credential request", re: /\b(?:print|show|reveal|list|dump|echo|cat|send|leak)\b[^.\n]{0,40}(?:\bapi[_ -]?keys?\b|\bsecrets?\b|\btokens?\b|\bpasswords?\b|\bcredentials?\b|\benv(?:ironment)? var(?:iable)?s?\b|\.env\b)/gi },
+  { id: "P02", name: "Credential request", re: /\b(?:print|show|reveal|list|dump|echo|cat|send|leak|give|provide|share|tell|output|return|display|expose|extract|export|include)\b[^.\n]{0,60}(?:\bapi[_ -]?keys?\b|\bsecrets?\b|\btokens?\b|\bpasswords?\b|\bcredentials?\b|\benv(?:ironment)? var(?:iable)?s?\b|\.env\b|\b(?:db|database) (?:config(?:uration)?|settings|user(?:name)?s?|logins?)\b|\bconnection strings?\b|\bconfig(?:uration)? (?:values|variables|file)\b|\bDB_[A-Z_]+)/gi },
+  { id: "P04", name: "Authority pretext", re: /\b(?:as an?|i am an?|i'm an?|acting as an?|in my (?:role|capacity) as an?)\s+(?:[\w-]+\s+){0,3}?(?:auditor|auditing|researcher|admin(?:istrator)?|security (?:team|officer|reviewer)|pen-?tester|red[ -]team(?:er)?|compliance officer)\b/gi },
   { id: "P03", name: "Instruction override", re: /\b(?:ignore|disregard|forget|override)\b[^.\n]{0,30}\b(?:previous|prior|above|all|earlier)\b[^.\n]{0,20}\b(?:instructions|rules|prompts?|policies)\b/gi },
 ]);
 
 export const SNIFF_RULE = Object.freeze({ id: "X01", name: "Cross-context credential sniffing" });
 export const CONFLICT_RULE = Object.freeze({ id: "C01", name: "Directive conflict" });
 
+const CTX = 64;
 const clock = () => (globalThis.performance ? performance.now() : Date.now());
 const elapsedUs = (t0) => Math.round((clock() - t0) * 1000);
 const newId = () =>
@@ -128,6 +138,7 @@ export class Sensor {
   _fresh() {
     this.session = Object.seal({ id: newId(), probes: 0, blocked: false });
     this._pending = "";
+    this._ctx = "";
     this._offset = 0;
     this._tracked = [];
   }
@@ -177,13 +188,18 @@ export class Sensor {
     const t0 = clock();
     if (this.session.blocked) return { emit: "", findings: [], action: "blocked", us: elapsedUs(t0) };
     const text = this._pending + chunk;
-    const hits = scanSecrets(text);
+    // Rescan the last emitted characters as context so a NAME= split from its value is still recognised (S12).
+    const ctx = this._ctx;
+    const hits = scanSecrets(ctx + text)
+      .map((h) => ({ ...h, start: h.start - ctx.length, end: h.end - ctx.length }))
+      .filter((h) => h.start >= 0);
     // Hold back the tail so a secret split across chunks is seen whole before anything is emitted.
     let cut = final ? text.length : Math.max(0, text.length - this.base.hold);
     for (const h of hits) if (h.start < cut && h.end > cut) cut = h.start;
     const base = this._offset;
     const done = hits.filter((h) => h.end <= cut).map((h) => ({ ...h, start: h.start + base, end: h.end + base }));
     let emit = text.slice(0, cut);
+    this._ctx = (ctx + emit).slice(-CTX);
     this._pending = text.slice(cut);
     this._offset += cut;
 

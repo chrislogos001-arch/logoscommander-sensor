@@ -1,9 +1,9 @@
-# logoscommander-sensor v1.0
+# logoscommander-sensor v1.0.1
 
 **A stateless security helper for LLM agent environments.**
 A small Los Angeles team building a security helper for AI coexistence.
 
-Status: v1.0 base framework. The bench is live at https://logoscommander-bench.pages.dev (Cloudflare Pages, static files only). Nothing is offered for sale yet. Pricing and the affiliate program below are planned, not live.
+Status: v1.0.1. The bench is live at https://logoscommander-bench.pages.dev (Cloudflare Pages, static files only). Nothing is offered for sale yet. Pricing and the affiliate program below are planned, not live.
 
 ---
 
@@ -41,16 +41,19 @@ logoscommander-sensor is one dependency-free JavaScript module. It sits between 
 | S08 | Slack token |
 | S09 | PEM private key block |
 | S10 | JSON Web Token |
+| S11 | Database connection string with an inline password (`postgres://user:pass@host`, also MySQL, MongoDB, Redis, AMQP, MSSQL) |
+| S12 | Credential assignment: a value assigned to a credential-like name (`DB_PASS=…`, `DB_USER=…`, `password: …`, `api_key=…`, `client_secret=…`). Only the value is redacted, so the variable name stays visible. Placeholders such as `null`, `***`, `${VAR}` and `<…>` are skipped. |
 
-When two signatures overlap on the same text, the one listed first in the table wins, so a single string is reported once.
+When two signatures overlap on the same text, the one listed first in the table wins, so a single string is reported once. For example, `STRIPE_SECRET_KEY=sk_live_…` is reported as S03, not S12.
 
 ### 3.2 Probe signatures (inbound)
 
 | ID | Signature |
 |---|---|
 | P01 | System-prompt / hidden-instruction extraction request |
-| P02 | Credential request (keys, secrets, tokens, passwords, env vars, `.env`) |
+| P02 | Credential request (keys, secrets, tokens, passwords, env vars, `.env`, database configuration or users, connection strings, `DB_*` names) |
 | P03 | Instruction-override request ("ignore all previous instructions") |
+| P04 | Authority pretext ("as an auditor / researcher / administrator / red teamer …") |
 
 ### 3.3 Composite and static signatures
 
@@ -61,7 +64,7 @@ When two signatures overlap on the same text, the one listed first in the table 
 
 ### 3.4 Streaming
 
-Output is checked chunk by chunk, as it is generated. The sensor holds back the last 256 characters (configurable via `hold`), so a credential split across several chunks is seen whole before any part of it is emitted. Each finding is reported once and carries absolute offsets.
+Output is checked chunk by chunk, as it is generated. The sensor holds back the last 256 characters (configurable via `hold`), so a credential split across several chunks is seen whole before any part of it is emitted. The last 64 emitted characters are rescanned as context, so `DB_PASS=` in one chunk and its value in the next is still caught. Each finding is reported once and carries absolute offsets.
 
 ## 4. Action layer (tiers)
 
@@ -102,18 +105,22 @@ The bench is a static page with three fields: agent rules, an inbound message, a
 
 ## 6. Measured performance
 
-`npm run perf` on the development VM (Node v20.18.0), Basic tier, plain text:
+Measured on the development VM. These are figures from one machine, not guarantees: latency in a real deployment depends on hardware, chunk size and text content.
+
+Scanning one outbound chunk (`npm run perf`, Node v20.18.0, Basic tier, plain text):
 
 | Chunk | Median | p99 |
 |---|---|---|
-| 512 chars | 3.7 µs | 19.1 µs |
-| 4,096 chars | 9.5 µs | 51.2 µs |
+| 512 chars | 7.8 µs | 33.2 µs |
+| 4,096 chars | 26.5 µs | 82.2 µs |
 
-These figures are for scanning only, measured on one machine. Latency in a real deployment depends on hardware, chunk size and text content.
+A full bench check in headless Chromium: rule conflicts, the inbound message, and the outbound `DB_USER=admin, DB_PASS=secret123`. The mean over 2,000 runs was 27–28 µs (3 runs of `tools/test_bench.py`).
+
+v1.0 measured 3.7 µs and 9.5 µs for the same two chunk sizes. v1.0.1 is slower because of the S12 rule. The bench page shows its own timing in steps of about 100 µs, because browsers round `performance.now()` that coarsely. A figure such as "200 µs" on the page means 1–2 timer steps, not a precise measurement.
 
 ## 7. Known limits (v1.0)
 
-- Detection relies on signatures. Credentials with no fixed format (passwords, custom tokens) are found only if they match S01–S10.
+- Detection relies on signatures. A credential with no fixed format is caught only in a `NAME=value` / `NAME: value` form (S12) or inside a connection string (S11). A bare password in prose ("the password is hunter2") is not caught.
 - C01 compares words and only works for English rules. It does not understand paraphrase.
 - Probe detection is a first-pass heuristic and will miss reworded attacks.
 - No vector index. Qdrant (or Qdrant Edge) could be added later for semantic matching. v1.0 keeps zero dependencies.

@@ -1,4 +1,4 @@
-"""Headless check of dist/: sample run finds the expected rules, redacts the key, and makes no outside requests."""
+"""Headless check of dist/ (or a live URL given as argv[1]): sample run finds the expected rules, redacts the key, and makes no outside requests."""
 import functools, http.server, threading, sys
 from pathlib import Path
 from playwright.sync_api import sync_playwright
@@ -7,7 +7,7 @@ DIST = Path(__file__).resolve().parent.parent / "dist"
 srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(DIST)))
 srv.RequestHandlerClass.log_message = lambda *a: None
 threading.Thread(target=srv.serve_forever, daemon=True).start()
-base = f"http://127.0.0.1:{srv.server_address[1]}"
+base = sys.argv[1].rstrip("/") if len(sys.argv) > 1 else f"http://127.0.0.1:{srv.server_address[1]}"
 ok = fail = 0
 
 def check(name, cond, extra=""):

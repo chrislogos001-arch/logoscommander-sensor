@@ -3,7 +3,7 @@
 **A stateless security helper for LLM agent environments.**
 A small Los Angeles team building a security helper for AI coexistence.
 
-Status: v1.0 base framework. It has been tested locally and is not yet deployed or offered for sale. Pricing and the affiliate program below are planned, not live.
+Status: v1.0 base framework. The bench is live at https://logoscommander-bench.pages.dev (Cloudflare Pages, static files only). Nothing is offered for sale yet. Pricing and the affiliate program below are planned, not live.
 
 ---
 

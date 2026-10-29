@@ -132,4 +132,8 @@ python3 tools/test_bench.py           # headless bench test (needs Playwright)
 npm run perf               # latency on your machine
 ```
 
+## 10. License
+
+Apache License 2.0. See [LICENSE](LICENSE).
+
 Contact: chris@logoscommander.com

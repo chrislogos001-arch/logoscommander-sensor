@@ -22,7 +22,7 @@ with sync_playwright() as p:
     pg.on("request", lambda r: reqs.append(r.url))
     pg.on("pageerror", lambda e: errors.append(str(e)))
     pg.goto(base + "/index.html")
-    check("version shown", pg.text_content("#ver") == "v1.0.1")
+    check("version shown", pg.text_content("#ver") == "v1.0.2")
     for tier, action in (("free", None), ("basic", "blocked"), ("cleanup", "purged")):
         pg.click("#sample")
         pg.select_option("#tier", tier)
@@ -59,6 +59,8 @@ with sync_playwright() as p:
     pg.click("#run")
     check("clean input: no findings", "No conflicts or leaks" in pg.text_content("#summary"))
     check("clean input: no alert", not pg.is_visible("#alert"))
+    check("report links to logoscommander.com", pg.get_attribute("#cta a", "href") == "https://logoscommander.com/contact" and pg.is_visible("#cta"))
+    check("footer links to logoscommander.com", pg.get_attribute("footer a", "href") == "https://logoscommander.com/")
     # performance.now() in a normal page is coarsened (100 µs steps in Chromium), so time a batch and divide.
     us = pg.evaluate("""async () => {
       const m = await import("./sensor.js");

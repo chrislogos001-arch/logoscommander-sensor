@@ -1,9 +1,10 @@
-# logoscommander-sensor v1.0.1
+# logoscommander-sensor v1.0.2
 
 **A stateless security helper for LLM agent environments.**
 A small Los Angeles team building a security helper for AI coexistence.
+Website: https://logoscommander.com
 
-Status: v1.0.1. The bench is live at https://logoscommander-bench.pages.dev (Cloudflare Pages, static files only). Nothing is offered for sale yet. Pricing and the affiliate program below are planned, not live.
+Status: v1.0.2. The bench is live at https://logoscommander-bench.pages.dev (Cloudflare Pages, static files only). Nothing is offered for sale yet. Pricing and the affiliate program below are planned, not live.
 
 ---
 
@@ -74,6 +75,8 @@ Output is checked chunk by chunk, as it is generated. The sensor holds back the 
 | **Basic Intercept** | $20 / month | Credentials are replaced with `[REDACTED:Sxx]` before they leave the sensor. On X01 the stream is stopped. |
 | **High-Fidelity Cleanup** | $30 / month | Basic Intercept, plus on X01: every context buffer registered with `track()` is zero-filled, the session is discarded, and a new one is built from the frozen baseline config, so service continues. |
 
+Paid tiers are not on sale yet: there is no checkout link. For licensing or enterprise terms, contact us at https://logoscommander.com/contact.
+
 What the cleanup action does, exactly:
 
 - **Zeroing:** applies to `Uint8Array` buffers the integrator registers with `track()`, and to the buffer passed to `maskBytes()`. JavaScript strings are immutable and cannot be overwritten; the sensor drops its references to them and the garbage collector frees them later.
@@ -118,6 +121,8 @@ A full bench check in headless Chromium: rule conflicts, the inbound message, an
 
 v1.0 measured 3.7 µs and 9.5 µs for the same two chunk sizes. v1.0.1 is slower because of the S12 rule. The bench page shows its own timing in steps of about 100 µs, because browsers round `performance.now()` that coarsely. A figure such as "200 µs" on the page means 1–2 timer steps, not a precise measurement.
 
+To reproduce these figures, run `npm run perf` and `python3 tools/test_bench.py` (section 9).
+
 ## 7. Known limits (v1.0)
 
 - Detection relies on signatures. A credential with no fixed format is caught only in a `NAME=value` / `NAME: value` form (S12) or inside a connection string (S11). A bare password in prose ("the password is hunter2") is not caught.
@@ -143,4 +148,4 @@ npm run perf               # latency on your machine
 
 Apache License 2.0. See [LICENSE](LICENSE).
 
-Contact: chris@logoscommander.com
+Website: https://logoscommander.com · Contact: chris@logoscommander.com

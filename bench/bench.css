@@ -20,3 +20,5 @@ pre { white-space:pre-wrap; word-break:break-all; min-height:2em; }
 footer { margin-top:32px; color:var(--mute); font-size:13px; }
 #alert { margin:12px 0; padding:12px 14px; border:2px solid var(--hi); border-radius:6px; background:color-mix(in srgb, var(--hi) 12%, transparent); color:var(--hi); font-weight:600; }
 #alert p { margin:4px 0 0; font-weight:400; color:var(--fg); }
+#cta { margin-top:16px; padding-top:12px; border-top:1px solid var(--line); color:var(--mute); }
+a { color:inherit; }

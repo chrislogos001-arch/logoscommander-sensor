@@ -1,7 +1,7 @@
 // logoscommander-sensor: stateless, dependency-free filter for LLM agent token streams.
 // One ES module; runs unchanged in Node >= 18 and in browsers.
 
-export const VERSION = "1.0.1";
+export const VERSION = "1.0.2";
 
 // Tier -> behaviour. free: report only. basic: redact secrets, stop the stream on a sniffing signature.
 // cleanup: as basic, but on a sniffing signature zero the tracked context buffers and continue on a fresh session.

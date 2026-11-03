@@ -2,6 +2,17 @@ import { Sensor, findConflicts, VERSION } from "./sensor.js";
 
 const $ = (id) => document.getElementById(id);
 
+const CHAR_LENGTH_TRUNCATION = 500;
+const FIELDS = { rules: "Agent rules", inbound: "Inbound message", outbound: "Outbound text" };
+const metrics = { total: 0, blocked: 0, fail: 0 };
+let lastMarked = true;
+
+function renderMetrics() {
+  $("m-total").textContent = metrics.total;
+  $("m-blocked").textContent = metrics.blocked;
+  $("m-fail").textContent = metrics.fail;
+}
+
 function lineCol(text, offset) {
   const before = text.slice(0, offset).split("\n");
   return `line ${before.length}, col ${before.at(-1).length + 1}`;
@@ -9,7 +20,7 @@ function lineCol(text, offset) {
 
 const WHERE = { in: "inbound message", out: "outbound text" };
 const TIER_ACTION = {
-  free: "reported only (Free tier does not modify traffic)",
+  free: "reported only (Alert mode does not modify traffic)",
   basic: "redacted before it left the sensor",
   cleanup: "redacted before it left the sensor",
 };
@@ -18,7 +29,7 @@ function describe(f, src, tier) {
   if (f.rule === "C01")
     return `Directive conflict: rule line ${f.a.line} "${f.a.text}" contradicts rule line ${f.b.line} "${f.b.text}". The agent cannot satisfy both; which one wins is undefined.`;
   if (f.rule === "X01") {
-    const outcome = tier === "basic" ? "The stream was stopped." : tier === "cleanup" ? "The session context was purged and a fresh session started." : "Under Basic or Cleanup this stream would be stopped.";
+    const outcome = tier === "basic" ? "The stream was stopped." : tier === "cleanup" ? "The session context was purged and a fresh session started." : "In Intercept or Intercept + purge mode this stream would be stopped.";
     return `Cross-context credential sniffing: an inbound request for secrets was followed by a credential in the output. ${outcome}`;
   }
   const at = lineCol(src[f.dir], f.start);
@@ -38,6 +49,16 @@ function item(f, src, tier) {
 
 function run() {
   const tier = $("tier").value;
+  const over = Object.keys(FIELDS).filter((id) => $(id).value.length > CHAR_LENGTH_TRUNCATION);
+  if (over.length) {
+    $("summary").textContent = `Not checked: ${over.map((id) => FIELDS[id]).join(", ")} over ${CHAR_LENGTH_TRUNCATION} characters.`;
+    $("summary").className = "";
+    $("findings").replaceChildren();
+    $("alert").hidden = true;
+    $("emitted").textContent = "";
+    $("report").hidden = false;
+    return;
+  }
   const src = { in: $("inbound").value, out: $("outbound").value };
   const sensor = new Sensor({ tier });
   const t0 = performance.now();
@@ -58,6 +79,20 @@ function run() {
   showAlert(findings, tier);
   $("emitted").textContent = pushed.emit + flushed.emit;
   $("report").hidden = false;
+  metrics.total += 1;
+  if (tier !== "free" && findings.some((f) => f.dir === "out" && /^[SX]/.test(f.rule))) metrics.blocked += 1;
+  lastMarked = false;
+  $("miss").disabled = false;
+  renderMetrics();
+}
+
+function markMiss() {
+  if (lastMarked) return;
+  lastMarked = true;
+  metrics.fail += 1;
+  $("miss").disabled = true;
+  $("miss-note").hidden = false;
+  renderMetrics();
 }
 
 function showAlert(findings, tier) {
@@ -65,7 +100,7 @@ function showAlert(findings, tier) {
   const sniff = findings.some((f) => f.rule === "X01");
   const leaks = findings.filter((f) => f.dir === "out" && f.rule.startsWith("S"));
   if (!sniff && !leaks.length) return (box.hidden = true);
-  const fate = tier === "free" ? "Free tier: reported only, output was not changed." : sniff && tier === "basic" ? "The stream was stopped and the credential redacted." : sniff ? "Credential redacted, context purged, fresh session started." : "Credential redacted from the output.";
+  const fate = tier === "free" ? "Alert mode: reported only, output was not changed." : sniff && tier === "basic" ? "The stream was stopped and the credential redacted." : sniff ? "Credential redacted, context purged, fresh session started." : "Credential redacted from the output.";
   const head = sniff ? "Logical collision: credential request in the input, credential in the output" : `Credential leak in the output (${leaks.length})`;
   const p = document.createElement("p");
   p.textContent = fate;
@@ -92,3 +127,4 @@ $("ver").textContent = "v" + VERSION;
 $("run").addEventListener("click", run);
 $("sample").addEventListener("click", sample);
 $("clear").addEventListener("click", clear);
+$("miss").addEventListener("click", markMiss);

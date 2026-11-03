@@ -13,24 +13,24 @@
 <main>
   <header>
     <h1>logoscommander-bench</h1>
-    <p class="sub">Runs entirely in this browser tab. Nothing you type is sent anywhere: the page has no backend and its security policy blocks all outgoing connections.</p>
+    <p class="sub">Runs entirely in this browser tab. Nothing you type is sent anywhere: the page has no backend and its security policy blocks all outgoing connections. Each field takes up to 500 characters.</p>
   </header>
 
   <label for="rules">1. Agent rules / system prompt</label>
-  <textarea id="rules" rows="6" spellcheck="false" placeholder="One directive per line, e.g. Always reply in English."></textarea>
+  <textarea id="rules" rows="6" maxlength="500" spellcheck="false" placeholder="One directive per line, e.g. Always reply in English."></textarea>
 
   <label for="inbound">2. Inbound message (user or tool input)</label>
-  <textarea id="inbound" rows="3" spellcheck="false"></textarea>
+  <textarea id="inbound" rows="3" maxlength="500" spellcheck="false"></textarea>
 
   <label for="outbound">3. Outbound text (model output to check)</label>
-  <textarea id="outbound" rows="6" spellcheck="false"></textarea>
+  <textarea id="outbound" rows="6" maxlength="500" spellcheck="false"></textarea>
 
   <div class="row">
-    <label for="tier" class="inline">Tier</label>
+    <label for="tier" class="inline">Mode</label>
     <select id="tier">
-      <option value="free">Free · alerts only</option>
-      <option value="basic">Basic · intercept</option>
-      <option value="cleanup">Cleanup · intercept + purge</option>
+      <option value="free">Alert only</option>
+      <option value="basic">Intercept</option>
+      <option value="cleanup">Intercept + purge</option>
     </select>
     <button id="run" type="button">Run check</button>
     <button id="sample" type="button" class="ghost">Load sample</button>
@@ -44,7 +44,18 @@
     <ol id="findings"></ol>
     <h3>Output after the sensor</h3>
     <pre id="emitted"></pre>
-    <p id="cta">Basic Intercept ($20/month) and High-Fidelity Cleanup ($30/month) are planned and not on sale yet. For licensing or enterprise terms: <a href="https://logoscommander.com/contact" rel="noopener">logoscommander.com/contact</a></p>
+  </section>
+
+  <section id="panel">
+    <h2>Sensor Sandbox Panel</h2>
+    <p class="sub">Counts for this tab only. They live in page memory, are never sent anywhere, and reset when the tab is reloaded or closed.</p>
+    <dl>
+      <dt>TOTAL_EVALUATIONS_INGESTED</dt><dd id="m-total">0</dd>
+      <dt>SUCCESSFUL_BLOCKED_ATTEMPTS</dt><dd id="m-blocked">0</dd>
+      <dt class="crit">CRITICAL_INTERCEPTION_FAILURES</dt><dd id="m-fail" class="crit">0</dd>
+    </dl>
+    <button id="miss" type="button" class="ghost" disabled>Mark last check as a miss</button>
+    <p id="miss-note" hidden>Counted in this tab only; nothing was collected. To contribute the case, open an issue at <a href="https://github.com/chrislogos001-arch/logoscommander-sensor/issues" rel="noopener">github.com/chrislogos001-arch/logoscommander-sensor/issues</a> and replace any real secret with a fake one first.</p>
   </section>
 
   <footer><a href="https://logoscommander.com/" rel="noopener">logoscommander.com</a> · logoscommander-sensor <span id="ver"></span> · Apache-2.0 · no cookies, no storage, no analytics</footer>

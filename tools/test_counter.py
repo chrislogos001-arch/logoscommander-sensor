@@ -11,7 +11,7 @@ def check(name, cond, extra=""):
     print(("PASS " if cond else "FAIL ") + name + ("" if cond else f"  {extra}"))
 
 def call(method, url, origin=None, body=None):
-    req = urllib.request.Request(url, method=method, data=body)
+    req = urllib.request.Request(url, method=method, data=body, headers={"User-Agent": "logoscommander-test-counter/1.0"})
     if origin:
         req.add_header("Origin", origin)
     try:

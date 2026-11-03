@@ -59,6 +59,15 @@ function run() {
     $("report").hidden = false;
     return;
   }
+  if (Object.keys(FIELDS).every((id) => !$(id).value.trim())) {
+    $("summary").textContent = "Nothing to check: all fields are empty. Enter agent rules, an inbound message or outbound text, or click Load sample.";
+    $("summary").className = "";
+    $("findings").replaceChildren();
+    $("alert").hidden = true;
+    $("emitted").textContent = "";
+    $("report").hidden = false;
+    return;
+  }
   const src = { in: $("inbound").value, out: $("outbound").value };
   const sensor = new Sensor({ tier });
   const t0 = performance.now();

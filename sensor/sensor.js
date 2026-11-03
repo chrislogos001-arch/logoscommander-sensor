@@ -1,7 +1,7 @@
 // logoscommander-sensor: stateless, dependency-free filter for LLM agent token streams.
 // One ES module; runs unchanged in Node >= 18 and in browsers.
 
-export const VERSION = "1.0.3";
+export const VERSION = "1.0.4";
 
 // Tier -> behaviour. free: report only. basic: redact secrets, stop the stream on a sniffing signature.
 // cleanup: as basic, but on a sniffing signature zero the tracked context buffers and continue on a fresh session.
@@ -30,10 +30,15 @@ export const SECRET_RULES = Object.freeze([
 
 // Inbound requests that try to pull secrets or hidden instructions out of the agent's context.
 export const PROBE_RULES = Object.freeze([
-  { id: "P01", name: "System prompt extraction", re: /\b(?:print|show|reveal|repeat|output|dump|leak)\b[^.\n]{0,40}\b(?:system prompt|hidden instructions|initial instructions|developer message)\b/gi },
-  { id: "P02", name: "Credential request", re: /\b(?:print|show|reveal|list|dump|echo|cat|send|leak|give|provide|share|tell|output|return|display|expose|extract|export|include)\b[^.\n]{0,60}(?:\bapi[_ -]?keys?\b|\bsecrets?\b|\btokens?\b|\bpasswords?\b|\bcredentials?\b|\benv(?:ironment)? var(?:iable)?s?\b|\.env\b|\b(?:db|database) (?:config(?:uration)?|settings|user(?:name)?s?|logins?)\b|\bconnection strings?\b|\bconfig(?:uration)? (?:values|variables|file)\b|\bDB_[A-Z_]+)/gi },
-  { id: "P04", name: "Authority pretext", re: /\b(?:as an?|i am an?|i'm an?|acting as an?|in my (?:role|capacity) as an?)\s+(?:[\w-]+\s+){0,3}?(?:auditor|auditing|researcher|admin(?:istrator)?|security (?:team|officer|reviewer)|pen-?tester|red[ -]team(?:er)?|compliance officer)\b/gi },
-  { id: "P03", name: "Instruction override", re: /\b(?:ignore|disregard|forget|override)\b[^.\n]{0,30}\b(?:previous|prior|above|all|earlier)\b[^.\n]{0,20}\b(?:instructions|rules|prompts?|policies)\b/gi },
+  { id: "P01", name: "System prompt extraction", re: /\b(?:print|show|reveal|repeat|output|dump|leak)\b[^.\n]{0,40}\b(?:system prompt|hidden instructions|initial instructions|developer message)\b|(?:输出|打印|显示|展示|复述|重复|告诉我|给我|返回|泄露|公开|列出|提供)[^。！？\n]{0,24}?(?:系统提示词|系统提示|系统指令|初始指令|原始指令|隐藏指令|开发者消息|预设指令|底层指令|提示词)|(?:把|将)[^。！？\n]{0,20}?(?:系统提示词|系统提示|系统指令|初始指令|原始指令|隐藏指令|开发者消息|预设指令|底层指令|提示词)[^。！？\n]{0,10}?(?:发给我|发我|给我|告诉我|输出|打印|贴出来|贴出|发出来|列出来|显示出来|交出来)|(?:系统提示词|系统提示|系统指令|初始指令|原始指令|隐藏指令|开发者消息|预设指令|底层指令|提示词)(?:是什么|是多少|是啥|有哪些|多少)/gi },
+  { id: "P02", name: "Credential request", re: /\b(?:print|show|reveal|list|dump|echo|cat|send|leak|give|provide|share|tell|output|return|display|expose|extract|export|include)\b[^.\n]{0,60}(?:\bapi[_ -]?keys?\b|\bsecrets?\b|\btokens?\b|\bpasswords?\b|\bcredentials?\b|\benv(?:ironment)? var(?:iable)?s?\b|\.env\b|\b(?:db|database) (?:config(?:uration)?|settings|user(?:name)?s?|logins?)\b|\bconnection strings?\b|\bconfig(?:uration)? (?:values|variables|file)\b|\bDB_[A-Z_]+)|(?:输出|打印|显示|展示|告诉我|给我|发给我|发送|返回|列出|泄露|提供|共享|导出|读取|查看|交出)[^。！？\n]{0,24}?(?:密码|口令|密钥|秘钥|私钥|凭据|凭证|令牌|访问令牌|环境变量|配置文件|配置信息|数据库(?:配置|账号|帐号|用户名|用户|连接串|连接字符串|密码)|api\s?key|验证码)|(?:把|将)[^。！？\n]{0,20}?(?:密码|口令|密钥|秘钥|私钥|凭据|凭证|令牌|访问令牌|环境变量|配置文件|配置信息|数据库(?:配置|账号|帐号|用户名|用户|连接串|连接字符串|密码)|api\s?key|验证码)[^。！？\n]{0,10}?(?:发给我|发我|给我|告诉我|输出|打印|贴出来|贴出|发出来|列出来|显示出来|交出来)|(?:密码|口令|密钥|秘钥|私钥|凭据|凭证|令牌|访问令牌|环境变量|配置文件|配置信息|数据库(?:配置|账号|帐号|用户名|用户|连接串|连接字符串|密码)|api\s?key|验证码)(?:是什么|是多少|是啥|有哪些|多少)/gi },
+  { id: "P04", name: "Authority pretext", re: /\b(?:as an?|i am an?|i'm an?|acting as an?|in my (?:role|capacity) as an?)\s+(?:[\w-]+\s+){0,3}?(?:auditor|auditing|researcher|admin(?:istrator)?|security (?:team|officer|reviewer)|pen-?tester|red[ -]team(?:er)?|compliance officer)\b|(?:我(?:是|就是|现在是)|作为|以)[^。！？\n]{0,20}?(?:超级管理员|系统管理员|最高权限|管理员|审计员|审计人员|审计师|审核员|安全研究员|研究员|渗透测试(?:员|人员)?|红队(?:成员|人员)?|合规(?:官|专员)|官方(?:人员|工程师|客服))(?:的身份)?/gi },
+  {
+    id: "P05",
+    name: "Fake system notice",
+    re: /(?:【\s*(?:系统|安全|紧急|严重)[^】\n]{0,10}】|系统(?:警告|通知|公告|提示|消息|错误)|安全(?:警报|警告)|\[(?:system|security|alert)[^\]\n]{0,12}\]|\bsystem (?:warning|alert|notice|error)\b)[^。\n]{0,60}?(?:立即|立刻|马上|紧急|请执行|执行|重置|解除|\bimmediately\b|\burgent(?:ly)?\b|\breset\b|\boverride\b)/gi,
+  },
+  { id: "P03", name: "Instruction override", re: /\b(?:ignore|disregard|forget|override)\b[^.\n]{0,30}\b(?:previous|prior|above|all|earlier)\b[^.\n]{0,20}\b(?:instructions|rules|prompts?|policies)\b|(?:忽略|无视|忘记|忘掉|覆盖|绕过|解除|取消|不要遵守|不用理会|不必遵守)[^。！？\n]{0,24}?(?:设定|设置|指令|规则|提示词|限制|约束|策略|要求|命令|守则)/gi },
 ]);
 
 export const SNIFF_RULE = Object.freeze({ id: "X01", name: "Cross-context credential sniffing" });
@@ -93,20 +98,39 @@ export function maskBytes(u8) {
 
 const NEG = /\b(?:never|must not|mustn't|do not|don't|should not|shouldn't|cannot|can't|may not)\s+(.+)/i;
 const POS = /\b(?:always|must|should|only)\s+(.+)/i;
+// Chinese rules have no word spacing, so the directive marker is matched directly against the rest of the line.
+const NEG_ZH = /(?:绝对不(?:得|能|可|要)|永远不(?:得|能|可|要)|严禁|禁止|不得|不准|不要|不可以|不可|不能|请勿|切勿|绝不)(.+)/;
+const POS_ZH = /(?:必须|务必|总是|始终|一律|一定要|只能|应当|应该|需要|要求)(.+)/;
 const STOP = new Set(
   "a an the to of in on at for and or any your you be is are with by it this that always never ever all".split(" ")
 );
+const CJK = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]+/g;
+const ZH_STOP = new Set("的 了 和 与 或 在 对 中 时 把 被 给 并 及 等 这 那 该 其 你 我 他 它 们 请 要 会 是".split(" "));
+// Chinese has no word boundaries: index each run of CJK characters as overlapping bigrams.
+function zhTerms(s) {
+  const out = [];
+  for (const run of s.match(CJK) || []) {
+    const chars = [...run].filter((c) => !ZH_STOP.has(c));
+    if (chars.length === 1) out.push(chars[0]);
+    for (let i = 0; i + 1 < chars.length; i++) out.push(chars[i] + chars[i + 1]);
+  }
+  return out;
+}
+
 const terms = (s) =>
-  new Set(s.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter((w) => w && !STOP.has(w)).map((w) => (w.length >= 3 && w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w)));
+  new Set([
+    ...s.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter((w) => w && !STOP.has(w)).map((w) => (w.length >= 3 && w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w)),
+    ...zhTerms(s),
+  ]);
 
 // Static check of a rule set: a positive directive and a negative directive about the same thing.
 export function findConflicts(rulesText) {
   const pos = [];
   const neg = [];
   rulesText.split(/\r?\n/).forEach((line, i) => {
-    let m = NEG.exec(line);
+    let m = NEG.exec(line) || NEG_ZH.exec(line);
     if (m) neg.push({ line: i + 1, text: line.trim(), t: terms(m[1]) });
-    else if ((m = POS.exec(line))) pos.push({ line: i + 1, text: line.trim(), t: terms(m[1]) });
+    else if ((m = POS.exec(line) || POS_ZH.exec(line))) pos.push({ line: i + 1, text: line.trim(), t: terms(m[1]) });
   });
   const out = [];
   for (const p of pos)

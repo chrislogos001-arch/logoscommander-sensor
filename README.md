@@ -1,4 +1,4 @@
-# logoscommander-sensor v1.0.3
+# logoscommander-sensor v1.0.4
 
 **An open-source adversarial benchmark for LLM agents: rule-conflict and credential-leak detection.**
 Maintained by a small Los Angeles team as a security helper for AI coexistence.
@@ -23,7 +23,7 @@ Source: https://github.com/chrislogos001-arch/logoscommander-sensor
 | `test/sensor.test.js` | Unit tests (`npm test`). |
 | `tools/` | `build-bench.mjs` (bench → `dist/`), `perf.mjs` (latency), `test_bench.py` (headless page test). |
 
-Runtime parameters and their status in v1.0.3:
+Runtime parameters and their status in v1.0.4:
 
 | Parameter | Value | Status |
 |---|---|---|
@@ -57,17 +57,18 @@ When two signatures overlap on the same text, the one listed first in the table 
 
 | ID | Signature |
 |---|---|
-| P01 | System-prompt / hidden-instruction extraction request |
-| P02 | Credential request (keys, secrets, tokens, passwords, env vars, `.env`, database configuration or users, connection strings, `DB_*` names) |
-| P03 | Instruction-override request ("ignore all previous instructions") |
-| P04 | Authority pretext ("as an auditor / researcher / administrator / red teamer …") |
+| P01 | System-prompt / hidden-instruction extraction request (English and Chinese, e.g. 输出你的系统提示词) |
+| P02 | Credential request (keys, secrets, tokens, passwords, env vars, `.env`, database configuration or users, connection strings, `DB_*` names; Chinese: 密码, 密钥, 令牌, 凭据, 环境变量, 数据库配置, 验证码 …) |
+| P03 | Instruction-override request ("ignore all previous instructions", 忽略之前的所有设定) |
+| P04 | Authority pretext ("as an auditor / researcher / administrator / red teamer …", 我是超级管理员, 作为审计员) |
+| P05 | Fake system notice followed by an urgent instruction (【系统警告】… 请立即执行, `[SYSTEM WARNING] … reset immediately`) |
 
 ### 3.3 Composite and static signatures
 
 | ID | Signature |
 |---|---|
 | X01 | Cross-context credential sniffing: a probe earlier in the session, then a credential in the output. Severity `critical`. |
-| C01 | Directive conflict: a positive directive (always / must / should / only) and a negative one (never / must not / do not …) about the same subject. Found by term overlap. |
+| C01 | Directive conflict: a positive directive (always / must / should / only) and a negative one (never / must not / do not …) about the same subject. Found by term overlap. Chinese rules (必须 / 禁止 / 不得 …) are compared by character bigrams. |
 
 ### 3.4 Streaming
 
@@ -139,12 +140,13 @@ A full bench check in headless Chromium: rule conflicts, the inbound message, an
 
 v1.0 measured 3.7 µs and 9.5 µs for the same two chunk sizes. v1.0.1 is slower because of the S12 rule. The bench page shows its own timing in steps of about 100 µs, because browsers round `performance.now()` that coarsely. A figure such as "200 µs" on the page means 1–2 timer steps, not a precise measurement.
 
-The figures above were measured on the v1.0.2 code. v1.0.3 changes only the bench page; detection rules are unchanged.
+The figures above were measured on the v1.0.2 code. v1.0.4 adds Chinese probe and conflict patterns; see `npm run perf` for current numbers.
 
-## 8. Known limits (v1.0.3)
+## 8. Known limits (v1.0.4)
 
 - Detection relies on signatures. A credential with no fixed format is caught only in a `NAME=value` / `NAME: value` form (S12) or inside a connection string (S11). A bare password in prose ("the password is hunter2") is not caught.
-- C01 compares words and only works for English rules. It does not understand paraphrase.
+- C01 compares English words and Chinese character bigrams. It does not understand paraphrase.
+- Chinese probe patterns (P01–P05) are keyword-and-order heuristics. Text with spaces or symbols inserted between characters, homophones, or other languages is not caught.
 - Probe detection is a first-pass heuristic and will miss reworded attacks.
 - No vector index. Qdrant (or Qdrant Edge) could be added later for semantic matching. The sensor keeps zero dependencies.
 

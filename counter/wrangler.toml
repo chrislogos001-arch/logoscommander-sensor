@@ -1,0 +1,26 @@
+name = "bench-counter"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+workers_dev = true
+
+# No Workers Logs / tail sampling: the Worker keeps no request log.
+[observability]
+enabled = false
+
+[vars]
+ALLOWED_ORIGIN = "https://logoscommander-bench.pages.dev"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "bench-counter-db"
+database_id = "0c7d31ac-11dd-44a1-bcfc-ac63e035cdf4"
+
+# Workers Rate Limiting binding: periods of 10 s or 60 s only.
+# 5 per 10 s per IP averages 1 request per 2 s.
+[[ratelimits]]
+name = "RL"
+namespace_id = "1055"
+
+  [ratelimits.simple]
+  limit = 5
+  period = 10

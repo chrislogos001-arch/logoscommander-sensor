@@ -1,4 +1,4 @@
-# logoscommander-sensor v1.0.4
+# logoscommander-sensor v1.0.5
 
 **An open-source adversarial benchmark for LLM agents: rule-conflict and credential-leak detection.**
 Maintained by a small Los Angeles team as a security helper for AI coexistence.
@@ -22,15 +22,16 @@ Source: https://github.com/chrislogos001-arch/logoscommander-sensor
 | `bench/` | logoscommander-bench: a static single page that runs the sensor in the visitor's browser. |
 | `test/sensor.test.js` | Unit tests (`npm test`). |
 | `tools/` | `build-bench.mjs` (bench → `dist/`), `perf.mjs` (latency), `test_bench.py` (headless page test). |
+| `counter/` | bench-counter: Cloudflare Worker + D1 that keeps the three public panel counts. |
 
-Runtime parameters and their status in v1.0.4:
+Runtime parameters and their status in v1.0.5:
 
 | Parameter | Value | Status |
 |---|---|---|
 | `CHAR_LENGTH_TRUNCATION` | `500` | **Enforced.** Each bench field has `maxlength="500"`, so a longer paste is cut at 500 characters. Input over 500 characters set by any other means is refused with "Not checked", not silently truncated, because scanning only the first 500 characters would miss a credential placed after them. |
-| `ZERO_TRACKING_BEACON` | `true` | **Enforced.** No analytics, beacons, cookies or browser storage. The CSP allows first-party scripts only and `connect-src 'none'`. Checked on 2026-10-29: the pages.dev response contains no Cloudflare Web Analytics beacon. |
+| `ZERO_TRACKING_BEACON` | `true` | **Enforced.** No analytics, beacons, cookies or browser storage. The CSP allows first-party scripts only, and `connect-src` allows only the counter API (section 10). Checked on 2026-10-29: the pages.dev response contains no Cloudflare Web Analytics beacon. |
 | `GLOBAL_DAILY_LIMIT` | `10000` | **Not enforced.** A static page cannot count checks made by other visitors. Every check runs on the visitor's own CPU, so there is no server workload to cap. |
-| `SINGLE_IP_LIMIT` | `100` / 24 h | **Not enforced.** The page cannot see the visitor's IP address. A per-IP limit would need an edge rate-limiting rule or a backend, which in turn sees IPs; neither is in place. |
+| `SINGLE_IP_LIMIT` | `100` / 24 h | **Not enforced.** The page cannot see the visitor's IP address. The counter API (section 10) has its own, separate limit of 5 counter updates per 10 s per IP. |
 
 ## 3. Detection specification
 
@@ -107,8 +108,10 @@ The bench is a static page with three fields (agent rules, an inbound message, m
 
 Zero-logs protocol:
 
-- No backend, no database, no cookies, no `localStorage`, no analytics.
-- `Content-Security-Policy: connect-src 'none'` blocks the page from sending anything anywhere; `tools/test_bench.py` checks that no request leaves the page's origin.
+- Checks run in the browser. Text typed into the fields is never sent anywhere.
+- No cookies, no `localStorage`, no analytics.
+- The only outgoing requests go to the counter API (section 10). They contain only `?action=check|block|fail`: no body, no cookies, no referrer.
+- `Content-Security-Policy: connect-src https://bench-counter.polished-pine-5c63.workers.dev` blocks every other destination. `tools/test_bench.py` checks that no other origin is contacted and that counter requests contain no user text.
 - Not covered by this protocol: the static host (Cloudflare) sees the visitor's IP address and the page URL at the network edge, as any web host does. Page content is never sent to it.
 
 ## 6. Dataset and context vectors (reserved)
@@ -142,7 +145,7 @@ v1.0 measured 3.7 µs and 9.5 µs for the same two chunk sizes. v1.0.1 is slower
 
 The figures above were measured on the v1.0.2 code. v1.0.4 adds Chinese probe and conflict patterns; see `npm run perf` for current numbers.
 
-## 8. Known limits (v1.0.4)
+## 8. Known limits (v1.0.5)
 
 - Detection relies on signatures. A credential with no fixed format is caught only in a `NAME=value` / `NAME: value` form (S12) or inside a connection string (S11). A bare password in prose ("the password is hunter2") is not caught.
 - C01 compares English words and Chinese character bigrams. It does not understand paraphrase.
@@ -160,20 +163,27 @@ python3 tools/test_bench.py           # headless bench test (needs Playwright)
 npm run perf               # latency on your machine
 ```
 
-## 10. Sensor Sandbox Panel and outcome harvesting
+## 10. Sensor Sandbox Panel and counter API
 
-The bench shows three counters below the report. They count checks in the current browser tab only, live in page memory, are never sent anywhere, and reset on reload.
+The panel shows three public counts across all visitors: TOTAL EVALUATIONS, SUCCESSFUL BLOCKS and CRITICAL FAILURES. They are kept by `counter/`, a Cloudflare Worker with a D1 database. The database has one table with three rows (`total`, `blocks`, `failures`) and nothing else.
 
-| Metric | Meaning |
+| Request | Effect |
 |---|---|
-| `TOTAL_EVALUATIONS_INGESTED` | Checks run in this tab. |
-| `SUCCESSFUL_BLOCKED_ATTEMPTS` | Checks in Intercept or Intercept + purge mode where a credential in the output was redacted or the stream was stopped. |
-| **`CRITICAL_INTERCEPTION_FAILURES`** (shown in red on the bench) | Checks the visitor marked as a miss with "Mark last check as a miss". The sensor cannot detect its own misses. |
+| `GET /v1/counts` | Returns `{"total": n, "blocks": n, "failures": n}` |
+| `POST /v1/counts?action=check` | A check with no blocked leak: `total` +1 |
+| `POST /v1/counts?action=block` | A check where Intercept or Intercept + purge blocked a leak: `total` +1, `blocks` +1 |
+| `POST /v1/counts?action=fail` | The visitor clicked "Mark last check as a miss": `failures` +1 |
 
-> [!CAUTION]
-> `CRITICAL_INTERCEPTION_FAILURES` above zero means the sensor let a credential or attack through. Treat each one as a missing rule.
+- **No content.** The Worker never reads the request body. The page sends no body, no cookies and no referrer.
+- **Origin.** CORS allows only `https://logoscommander-bench.pages.dev`. A `POST` from any other `Origin` gets 403. A non-browser client can fake the `Origin` header, so this does not stop scripted requests.
+- **Rate limit.** 5 updates per 10 s per IP (Workers Rate Limiting binding; 10 s is its shortest period). Over the limit, the counts are returned unchanged with `"limited": true` and HTTP 200, so the page logs no HTTP error. The binding is per Cloudflare location and eventually consistent. In a test on 2026-11-03, 15 rapid requests passed before the limit started to apply.
+- **What is stored.** No IP address, user agent or timestamp is stored. The IP is used only as the rate-limit key, which Cloudflare keeps for the 10 s window. Workers Logs are disabled. Cloudflare still sees the IP at the network edge, as any web host does.
+- **Accuracy.** The counts are reported by browsers and are not verified. Anyone can raise them by sending requests within the rate limit, so they are not evidence of real detections.
+- **API down.** The check still runs locally and the panel shows "—". The fetch is wrapped in try/catch with a 4 s timeout. The browser itself may still print a network error line in the console; page code cannot suppress it.
 
-Outcome harvesting (collecting missed inputs of 500 characters or less into a post-training alignment dataset) is **not implemented**. It would require uploading what visitors paste, which may include real secrets, and that conflicts with the zero-logs protocol in section 5. To contribute a missed case today, open a GitHub issue at https://github.com/chrislogos001-arch/logoscommander-sensor/issues with any real secret replaced by a fake one. If harvesting is added later, it will be opt-in per case and documented here first.
+Outcome harvesting (collecting missed inputs into a post-training dataset) is **not implemented**. "Mark last check as a miss" only adds 1 to `failures`; the input is not sent. To contribute a missed case, open a GitHub issue at https://github.com/chrislogos001-arch/logoscommander-sensor/issues with any real secret replaced by a fake one.
+
+Deploying the counter: `cd counter && npx wrangler d1 execute bench-counter-db --remote --file schema.sql && npx wrangler deploy`.
 
 ## 11. License
 

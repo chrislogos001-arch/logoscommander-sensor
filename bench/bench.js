@@ -4,13 +4,38 @@ const $ = (id) => document.getElementById(id);
 
 const CHAR_LENGTH_TRUNCATION = 500;
 const FIELDS = { rules: "Agent rules", inbound: "Inbound message", outbound: "Outbound text" };
-const metrics = { total: 0, blocked: 0, fail: 0 };
+// Public counter API (counter/ in the repo). Requests carry only ?action=…: no body, no cookies, no referrer.
+const COUNTER_API = "https://bench-counter.polished-pine-5c63.workers.dev/v1/counts";
+const COUNTER_TIMEOUT_MS = 4000;
 let lastMarked = true;
 
-function renderMetrics() {
-  $("m-total").textContent = metrics.total;
-  $("m-blocked").textContent = metrics.blocked;
-  $("m-fail").textContent = metrics.fail;
+const fmt = (n) => (Number.isSafeInteger(n) && n >= 0 ? n.toLocaleString("en-US") : "—");
+
+function renderCounts(c) {
+  $("m-total").textContent = fmt(c.total);
+  $("m-blocked").textContent = fmt(c.blocks);
+  $("m-fail").textContent = fmt(c.failures);
+}
+
+// Fire and forget. Any failure (offline, timeout, API down) leaves the panel as it was.
+async function counter(action) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), COUNTER_TIMEOUT_MS);
+  try {
+    const res = await fetch(action ? `${COUNTER_API}?action=${action}` : COUNTER_API, {
+      method: action ? "POST" : "GET",
+      mode: "cors",
+      credentials: "omit",
+      cache: "no-store",
+      referrerPolicy: "no-referrer",
+      signal: ctl.signal,
+    });
+    if (res.ok) renderCounts(await res.json());
+  } catch {
+    // Counter unavailable: the local check result is unaffected.
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function lineCol(text, offset) {
@@ -88,20 +113,17 @@ function run() {
   showAlert(findings, tier);
   $("emitted").textContent = pushed.emit + flushed.emit;
   $("report").hidden = false;
-  metrics.total += 1;
-  if (tier !== "free" && findings.some((f) => f.dir === "out" && /^[SX]/.test(f.rule))) metrics.blocked += 1;
+  const blocked = tier !== "free" && findings.some((f) => f.dir === "out" && /^[SX]/.test(f.rule));
   lastMarked = false;
   $("miss").disabled = false;
-  renderMetrics();
+  counter(blocked ? "block" : "check");
 }
 
 function markMiss() {
   if (lastMarked) return;
   lastMarked = true;
-  metrics.fail += 1;
   $("miss").disabled = true;
-  $("miss-note").hidden = false;
-  renderMetrics();
+  counter("fail");
 }
 
 function showAlert(findings, tier) {
@@ -137,3 +159,4 @@ $("run").addEventListener("click", run);
 $("sample").addEventListener("click", sample);
 $("clear").addEventListener("click", clear);
 $("miss").addEventListener("click", markMiss);
+counter();

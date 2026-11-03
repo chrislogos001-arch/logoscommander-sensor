@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src https://bench-counter.polished-pine-5c63.workers.dev; form-action 'none'; base-uri 'none'">
 <title>logoscommander-bench · local rule and leak check</title>
 <link rel="stylesheet" href="bench.css">
 <script type="module" src="bench.js"></script>
@@ -13,7 +13,7 @@
 <main>
   <header>
     <h1>logoscommander-bench</h1>
-    <p class="sub">Runs entirely in this browser tab. Nothing you type is sent anywhere: the page has no backend and its security policy blocks all outgoing connections. Each field takes up to 500 characters.</p>
+    <p class="sub">Checks run in this browser tab and nothing you type leaves it. After each check the page sends one anonymous +1 to a public counter, with no text, cookies or IDs. Each field takes up to 500 characters.</p>
   </header>
 
   <label for="rules">1. Agent rules / system prompt</label>
@@ -46,16 +46,14 @@
     <pre id="emitted"></pre>
   </section>
 
-  <section id="panel">
-    <h2>Sensor Sandbox Panel</h2>
-    <p class="sub">Counts for this tab only. They live in page memory, are never sent anywhere, and reset when the tab is reloaded or closed.</p>
-    <dl>
-      <dt>TOTAL_EVALUATIONS_INGESTED</dt><dd id="m-total">0</dd>
-      <dt>SUCCESSFUL_BLOCKED_ATTEMPTS</dt><dd id="m-blocked">0</dd>
-      <dt class="crit">CRITICAL_INTERCEPTION_FAILURES</dt><dd id="m-fail" class="crit">0</dd>
-    </dl>
+  <section id="panel" aria-label="Sensor Sandbox Panel">
+    <h2>SENSOR SANDBOX PANEL</h2>
+    <div class="grid">
+      <div class="metric"><span class="label">TOTAL EVALUATIONS</span><span class="value" id="m-total">—</span></div>
+      <div class="metric"><span class="label">SUCCESSFUL BLOCKS</span><span class="value" id="m-blocked">—</span></div>
+      <div class="metric crit"><span class="label">CRITICAL FAILURES</span><span class="value" id="m-fail">—</span></div>
+    </div>
     <button id="miss" type="button" class="ghost" disabled>Mark last check as a miss</button>
-    <p id="miss-note" hidden>Counted in this tab only; nothing was collected. To contribute the case, open an issue at <a href="https://github.com/chrislogos001-arch/logoscommander-sensor/issues" rel="noopener">github.com/chrislogos001-arch/logoscommander-sensor/issues</a> and replace any real secret with a fake one first.</p>
   </section>
 
   <footer><a href="https://logoscommander.com/" rel="noopener">logoscommander.com</a> · logoscommander-sensor <span id="ver"></span> · Apache-2.0 · no cookies, no storage, no analytics</footer>
